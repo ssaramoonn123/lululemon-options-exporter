@@ -573,7 +573,7 @@ async function extractLululemonProduct() {
             );
 
 
-        if (inputs.length >= 2) {
+        if (inputs.length >= 1) {
             break;
         }
 
