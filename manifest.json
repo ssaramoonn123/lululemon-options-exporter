@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Lululemon Options Exporter",
+  "version": "1.0.0",
+  "description": "Export Lululemon product options to Excel.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://shop.lululemon.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Export Lululemon Options"
+  }
+}
