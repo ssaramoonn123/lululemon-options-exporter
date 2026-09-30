@@ -345,12 +345,12 @@ exportButton.addEventListener("click", async () => {
         const excelData = [
 
             [
-                "컬러",
-                "사이즈",
+                "Color",
+                "Size",
                 "옵션가",
                 "재고수량",
                 "관리코드",
-                "사용 여부"
+                "사용여부"
             ]
 
         ];
@@ -433,7 +433,7 @@ exportButton.addEventListener("click", async () => {
         XLSX.utils.book_append_sheet(
             workbook,
             worksheet,
-            "옵션"
+            "Sheet0"
         );
 
 
@@ -469,7 +469,7 @@ exportButton.addEventListener("click", async () => {
 
 
         const fileName =
-            `${productTitle}.xlsx`;
+            `${productTitle}.xls`;
 
 
         // =====================================================
@@ -478,7 +478,8 @@ exportButton.addEventListener("click", async () => {
 
         XLSX.writeFile(
             workbook,
-            fileName
+            fileName,
+            { bookType: "biff8" }
         );
 
 
