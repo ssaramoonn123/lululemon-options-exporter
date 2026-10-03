@@ -91,41 +91,152 @@ async function extractLululemonProduct() {
 
 
     // =====================================================
-    // READ THE SIZES THE CUSTOMER ACTUALLY SEES
+    // NORMALIZE SIZE
     //
-    // IMPORTANT:
+    // Supports:
     //
-    // Do NOT use:
-    //
-    // data-lll-component-name="pdp:size_selector:2"
-    //
-    // because "2" is not necessarily the displayed size.
-    //
-    // Instead read the visible text:
-    //
-    // XXS XS S M L XL
-    //
-    // or:
-    //
+    // Numeric:
     // 0 2 4 6 8 10 12 14 16 18 20
+    //
+    // Standard:
+    // XXS XS S M L XL XXL
+    //
+    // Combined:
+    // XS/S M/L XL/XXL
+    //
+    // One Size
+    //
+    // Invalid/internal strings are rejected.
+    // =====================================================
+
+    function normalizeSize(size) {
+
+        const text =
+            String(size)
+                .replace(/\s+/g, " ")
+                .trim();
+
+
+        if (!text) {
+            return null;
+        }
+
+
+        // Numeric sizes
+        if (/^\d+$/.test(text)) {
+            return text;
+        }
+
+
+        // One Size
+        if (/^ONE\s*SIZE$/i.test(text)) {
+            return "ONE SIZE";
+        }
+
+
+        // Standard and combined letter sizes.
+        const parts =
+            text
+                .split("/")
+                .map(part => part.trim());
+
+
+        const validLetterSize =
+            /^(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)$/i;
+
+
+        if (
+            parts.length >= 1 &&
+            parts.every(
+                part =>
+                    validLetterSize.test(part)
+            )
+        ) {
+
+            return parts
+                .map(
+                    part =>
+                        part.toUpperCase()
+                )
+                .join("/");
+        }
+
+
+        return null;
+    }
+
+
+    // =====================================================
+    // READ THE SIZES THE CUSTOMER ACTUALLY SEES
     // =====================================================
 
     function readCurrentSizes() {
 
-        const group = getSizeGroup();
+        const group =
+            getSizeGroup();
+
+
+        // -------------------------------------------------
+        // ONE-SIZE PRODUCT FALLBACK
+        //
+        // Some accessories have no selectable size buttons.
+        // The page simply displays:
+        //
+        // Size   One Size
+        // -------------------------------------------------
 
         if (!group) {
+
+            const elements = [
+                ...document.querySelectorAll(
+                    "span, p, div, label"
+                )
+            ];
+
+
+            const oneSizeElement =
+                elements.find(
+                    element => {
+
+                        const text =
+                            element.textContent
+                                .replace(
+                                    /\s+/g,
+                                    " "
+                                )
+                                .trim();
+
+
+                        return (
+                            /^One Size$/i.test(
+                                text
+                            ) ||
+                            /^Size\s+One Size$/i.test(
+                                text
+                            )
+                        );
+                    }
+                );
+
+
+            if (oneSizeElement) {
+                return ["ONE SIZE"];
+            }
+
+
             return [];
         }
 
 
-        const sizes = new Set();
+        const sizes =
+            new Set();
 
 
         // -------------------------------------------------
         // PRIMARY METHOD
         //
-        // Read visible text from Lululemon's size tiles.
+        // Read visible text directly from Lululemon's
+        // actual size tiles.
         // -------------------------------------------------
 
         const tiles = [
@@ -139,49 +250,23 @@ async function extractLululemonProduct() {
 
             const visibleText =
                 tile.textContent
-                    .replace(/\s+/g, " ")
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
                     .trim();
 
 
-            if (!visibleText) {
-                continue;
-            }
-
-
-            // Numeric sizes
-            if (/^\d+$/.test(visibleText)) {
-
-                sizes.add(
+            const normalized =
+                normalizeSize(
                     visibleText
                 );
 
-                continue;
-            }
 
-
-            // Letter sizes
-            if (
-                /^(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)$/i
-                    .test(visibleText)
-            ) {
+            if (normalized) {
 
                 sizes.add(
-                    visibleText.toUpperCase()
-                );
-
-                continue;
-            }
-
-
-            // One Size
-            if (
-                /^ONE\s*SIZE$/i.test(
-                    visibleText
-                )
-            ) {
-
-                sizes.add(
-                    "ONE SIZE"
+                    normalized
                 );
             }
         }
@@ -190,7 +275,7 @@ async function extractLululemonProduct() {
         // -------------------------------------------------
         // FALLBACK
         //
-        // If the size-tile attribute changes on another PDP,
+        // If Lululemon changes the size-tile attribute,
         // inspect labels/buttons inside the main size group.
         // -------------------------------------------------
 
@@ -203,46 +288,30 @@ async function extractLululemonProduct() {
             ];
 
 
-            for (const element of candidates) {
+            for (
+                const element
+                of candidates
+            ) {
 
                 const text =
                     element.textContent
-                        .replace(/\s+/g, " ")
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
                         .trim();
 
 
-                if (!text) {
-                    continue;
-                }
-
-
-                if (/^\d+$/.test(text)) {
-
-                    sizes.add(text);
-
-                    continue;
-                }
-
-
-                if (
-                    /^(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)$/i
-                        .test(text)
-                ) {
-
-                    sizes.add(
-                        text.toUpperCase()
+                const normalized =
+                    normalizeSize(
+                        text
                     );
 
-                    continue;
-                }
 
-
-                if (
-                    /^ONE\s*SIZE$/i.test(text)
-                ) {
+                if (normalized) {
 
                     sizes.add(
-                        "ONE SIZE"
+                        normalized
                     );
                 }
             }
@@ -361,7 +430,9 @@ async function extractLululemonProduct() {
         colorId
     ) {
 
-        const timeout = 2500;
+        const timeout =
+            2500;
+
 
         const start =
             performance.now();
@@ -372,7 +443,8 @@ async function extractLululemonProduct() {
         // -------------------------------------------------
 
         while (
-            performance.now() - start <
+            performance.now() -
+                start <
             timeout
         ) {
 
@@ -392,10 +464,15 @@ async function extractLululemonProduct() {
                 input.checked &&
                 (
                     !urlColor ||
-                    String(urlColor) ===
-                        String(colorId)
+                    String(
+                        urlColor
+                    ) ===
+                    String(
+                        colorId
+                    )
                 )
             ) {
+
                 break;
             }
 
@@ -408,9 +485,13 @@ async function extractLululemonProduct() {
         // Wait until visible size buttons stop changing.
         // -------------------------------------------------
 
-        let previousSnapshot = null;
+        let previousSnapshot =
+            null;
 
-        let stableCount = 0;
+
+        let stableCount =
+            0;
+
 
         const stabilityStart =
             performance.now();
@@ -418,7 +499,7 @@ async function extractLululemonProduct() {
 
         while (
             performance.now() -
-            stabilityStart <
+                stabilityStart <
             1800
         ) {
 
@@ -443,12 +524,16 @@ async function extractLululemonProduct() {
                 previousSnapshot =
                     snapshot;
 
-                stableCount = 0;
+                stableCount =
+                    0;
             }
 
 
             // ~320ms with the same size list
-            if (stableCount >= 4) {
+            if (
+                stableCount >= 4
+            ) {
+
                 return;
             }
         }
@@ -513,9 +598,13 @@ async function extractLululemonProduct() {
         underscoreIndex !== -1 &&
         parts[underscoreIndex + 1]
 
-            ? parts[underscoreIndex + 1]
+            ? parts[
+                underscoreIndex + 1
+            ]
 
-            : parts[parts.length - 1];
+            : parts[
+                parts.length - 1
+            ];
 
 
     if (!productId) {
@@ -564,7 +653,8 @@ async function extractLululemonProduct() {
 
     while (
         colourContainer &&
-        colourContainer !== document.body
+        colourContainer !==
+            document.body
     ) {
 
         const inputs =
@@ -573,13 +663,19 @@ async function extractLululemonProduct() {
             );
 
 
-        if (inputs.length >= 1) {
+        // Supports both single-colour
+        // and multi-colour products.
+        if (
+            inputs.length >= 1
+        ) {
+
             break;
         }
 
 
         colourContainer =
-            colourContainer.parentElement;
+            colourContainer
+                .parentElement;
     }
 
 
@@ -609,7 +705,10 @@ async function extractLululemonProduct() {
         new Map();
 
 
-    for (const input of initialInputs) {
+    for (
+        const input
+        of initialInputs
+    ) {
 
         const id =
             String(
@@ -629,6 +728,7 @@ async function extractLululemonProduct() {
             !id ||
             !name
         ) {
+
             continue;
         }
 
@@ -641,7 +741,8 @@ async function extractLululemonProduct() {
 
 
     if (
-        currentColors.size === 0
+        currentColors.size ===
+        0
     ) {
 
         throw new Error(
@@ -665,7 +766,8 @@ async function extractLululemonProduct() {
         originalSelected
 
             ? String(
-                originalSelected.value
+                originalSelected
+                    .value
             )
 
             : getURLColor();
@@ -680,7 +782,10 @@ async function extractLululemonProduct() {
 
 
     for (
-        const [colorId, colorName]
+        const [
+            colorId,
+            colorName
+        ]
         of currentColors.entries()
     ) {
 
@@ -711,12 +816,18 @@ async function extractLululemonProduct() {
             !input.checked ||
             (
                 currentURLColor &&
-                String(currentURLColor) !==
-                    String(colorId)
+                String(
+                    currentURLColor
+                ) !==
+                    String(
+                        colorId
+                    )
             )
         ) {
 
-            clickColour(input);
+            clickColour(
+                input
+            );
 
 
             await waitForColourUI(
@@ -726,7 +837,9 @@ async function extractLululemonProduct() {
 
         } else {
 
-            await sleep(250);
+            await sleep(
+                250
+            );
         }
 
 
@@ -738,7 +851,9 @@ async function extractLululemonProduct() {
             readCurrentSizes();
 
 
-        if (sizes.length === 0) {
+        if (
+            sizes.length === 0
+        ) {
 
             throw new Error(
                 `No visible sizes found for ${colorName}.`
@@ -748,7 +863,9 @@ async function extractLululemonProduct() {
 
         sizesByColor.set(
             colorId,
-            new Set(sizes)
+            new Set(
+                sizes
+            )
         );
     }
 
@@ -757,7 +874,9 @@ async function extractLululemonProduct() {
     // 6. RESTORE ORIGINAL COLOUR
     // =====================================================
 
-    if (originalColorId) {
+    if (
+        originalColorId
+    ) {
 
         const input =
             findColourInput(
@@ -771,7 +890,9 @@ async function extractLululemonProduct() {
             !input.checked
         ) {
 
-            clickColour(input);
+            clickColour(
+                input
+            );
 
 
             await waitForColourUI(
@@ -807,11 +928,15 @@ async function extractLululemonProduct() {
     const allSkuIds =
         fullAvailability.data.map(
             item =>
-                String(item.id)
+                String(
+                    item.id
+                )
         );
 
 
-    if (allSkuIds.length === 0) {
+    if (
+        allSkuIds.length === 0
+    ) {
 
         throw new Error(
             "No SKUs were returned."
@@ -823,7 +948,8 @@ async function extractLululemonProduct() {
     // 8. SPLIT SKU IDS INTO GROUPS OF 20
     // =====================================================
 
-    const chunks = [];
+    const chunks =
+        [];
 
 
     for (
@@ -847,9 +973,12 @@ async function extractLululemonProduct() {
     // Run four requests at once to reduce waiting time.
     // =====================================================
 
-    const allSkuDetails = [];
+    const allSkuDetails =
+        [];
 
-    const concurrency = 4;
+
+    const concurrency =
+        4;
 
 
     for (
@@ -876,7 +1005,10 @@ async function extractLululemonProduct() {
             );
 
 
-        for (const json of responses) {
+        for (
+            const json
+            of responses
+        ) {
 
             if (
                 Array.isArray(
@@ -895,15 +1027,13 @@ async function extractLululemonProduct() {
     // =====================================================
     // 10. FILTER TO CURRENT UI OPTIONS
     //
-    // Keep a SKU ONLY when:
+    // Keep a SKU only if:
     //
     // 1. Its colour exists on the current page.
+    // 2. Its size is actually displayed for that colour.
     //
-    // 2. Its size is ACTUALLY DISPLAYED in the size selector
-    //    when that colour is selected.
-    //
-    // This prevents historical sizes such as XXXS or 20
-    // from appearing when the customer cannot see them.
+    // normalizeSize() is deliberately used here too so
+    // the SKU size and UI size are compared consistently.
     // =====================================================
 
     const filteredSkuDetails =
@@ -914,34 +1044,30 @@ async function extractLululemonProduct() {
                     String(
                         item.attributes
                             ?.color
-                            ?.id ?? ""
+                            ?.id ??
+                            ""
                     );
 
 
-                let size =
+                const rawSize =
                     String(
                         item.attributes
-                            ?.size ?? ""
-                    ).trim();
+                            ?.size ??
+                            ""
+                    )
+                    .trim();
 
 
-                // Normalize letter sizes
-                if (
-                    /^(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)$/i
-                        .test(size)
-                ) {
-
-                    size =
-                        size.toUpperCase();
-                }
+                const size =
+                    normalizeSize(
+                        rawSize
+                    );
 
 
-                if (
-                    /^ONE\s*SIZE$/i.test(size)
-                ) {
+                // Invalid / unsupported SKU size
+                if (!size) {
 
-                    size =
-                        "ONE SIZE";
+                    return false;
                 }
 
 
@@ -954,6 +1080,7 @@ async function extractLululemonProduct() {
                         colorId
                     )
                 ) {
+
                     return false;
                 }
 
@@ -968,7 +1095,10 @@ async function extractLululemonProduct() {
                     );
 
 
-                if (!visibleSizes) {
+                if (
+                    !visibleSizes
+                ) {
+
                     return false;
                 }
 
@@ -988,14 +1118,17 @@ async function extractLululemonProduct() {
     // 11. REMOVE DUPLICATE SKU IDS
     // =====================================================
 
-    const uniqueSkuDetails = [];
+    const uniqueSkuDetails =
+        [];
+
 
     const seenSkuIds =
         new Set();
 
 
     for (
-        const item of filteredSkuDetails
+        const item
+        of filteredSkuDetails
     ) {
 
         const skuId =
@@ -1009,6 +1142,7 @@ async function extractLululemonProduct() {
                 skuId
             )
         ) {
+
             continue;
         }
 
@@ -1032,7 +1166,9 @@ async function extractLululemonProduct() {
         new Set(
             uniqueSkuDetails.map(
                 item =>
-                    String(item.id)
+                    String(
+                        item.id
+                    )
             )
         );
 
@@ -1043,12 +1179,15 @@ async function extractLululemonProduct() {
 
 
         data:
-            fullAvailability.data.filter(
-                item =>
-                    finalSkuIds.has(
-                        String(item.id)
-                    )
-            )
+            fullAvailability.data
+                .filter(
+                    item =>
+                        finalSkuIds.has(
+                            String(
+                                item.id
+                            )
+                        )
+                )
     };
 
 
@@ -1066,11 +1205,14 @@ async function extractLululemonProduct() {
             location.href,
 
         capturedAt:
-            new Date().toISOString(),
+            new Date()
+                .toISOString(),
 
 
         currentColors:
-            [...currentColors.entries()]
+            [
+                ...currentColors.entries()
+            ]
                 .map(
                     ([id, name]) => ({
                         id,
@@ -1080,9 +1222,16 @@ async function extractLululemonProduct() {
 
 
         sizesByColor:
-            [...sizesByColor.entries()]
+            [
+                ...sizesByColor.entries()
+            ]
                 .map(
-                    ([colorId, sizes]) => ({
+                    (
+                        [
+                            colorId,
+                            sizes
+                        ]
+                    ) => ({
 
                         colorId,
 
